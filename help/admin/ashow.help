@@ -1,6 +1,0 @@
-Syntax: ASHOW [OBJECT]
-
-Reverses the effects of AHIDE.
-
-Example: ashow dog
-
