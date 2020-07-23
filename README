@@ -1,12 +1,13 @@
 ==Kingdoms of Ahln MUD Server (KAMS)
 
 author:: Justin Collins
+maintainer:: Joshua 'Sykken' Murphy
 license:: GPLv2 except where noted
-website:: http://kingdomsofahln.com
+website:: http://kingdomsofahln.com (defunct)
 
 ===Requires
 
-Ruby[http://ruby-lang.org/] (1.8.6, 1.8.7, or 1.9.1)
+Ruby[http://ruby-lang.org/] (1.8.6, 1.8.7, 1.9.1 or 2.3)
 
 EventMachine[http://rubyeventmachine.com/]
 
