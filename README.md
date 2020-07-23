@@ -1,6 +1,7 @@
 ## Kingdoms of Ahln MUD Server (kams)
 
 Author: Justin Collins  
+Maintainer: Joshua 'Sykken' Murphy
 License: GPLv2 except where noted  
 Website: <http://kingdomsofahln.com>
 
@@ -48,3 +49,9 @@ The file help/syntax.rb provides syntax help in the game.
 ### Beware
 
 Some things (hunger) may appear to be implemented but they really are not.
+
+
+## Docker
+
+If you want to use docker, you can check out the build.sh and deploy.sh scripts for example deployments. 
+Keep in mind that storage is ephimeral unless you attach docker volumes or host directories to /storage and /conf in the container.
