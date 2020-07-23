@@ -1,5 +1,0 @@
-Syntax: AWATCH {START|STOP} [MOBILE]
-
-Echoes what a mobile sees to you.
-
-Example: awatch start dog

@@ -1,5 +1,0 @@
-Syntax: DELETEPLAYER [NAME]
-
-Deletes the given player.
-
-Example: deleteplayer bob
