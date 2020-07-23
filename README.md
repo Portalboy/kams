@@ -7,7 +7,7 @@ Website: <http://kingdomsofahln.com>
 
 ### Requires
 
-[Ruby](http://ruby-lang.org/) (1.8.6, 1.8.7, or 1.9.1)
+[Ruby](http://ruby-lang.org/) (1.8.6, 1.8.7, 1.9.1 or 2.3)
 
 [EventMachine](http://rubyeventmachine.com/)
 
