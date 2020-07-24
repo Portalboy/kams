@@ -11,6 +11,10 @@ require 'objects/exit'
 # terrain.underwater (Boolean)
 # terrain.room_type (Symbol)
 class Room < Container
+  #TODO: Make time-of-day method, relies on area's time-of-day descriptions, unless an instance variable is set with a time-of-day description.
+  #That way, rooms will default to using their area's time-of-day descriptions (which will default to using their world's)
+  #This allows areas and rooms to have customized messages. For instance, in a dense forest, you wouldn't want to say the sun is shining
+  #brilliantly overhead, would you? Maybe completely omit the messages if you're in a cave?
 
   attr_reader :terrain
 
@@ -23,6 +27,9 @@ class Room < Container
     info.terrain.water = false
     info.terrain.underwater = false
     info.terrain.room_type = :urban
+    info.terrain.dark = false
+    info.terrain.always_dark = false
+    @entry_point = false
   end
 
   #This returns the Area object this room resides within.
@@ -36,9 +43,67 @@ class Room < Container
     end
   end
 
+  def dark?
+    @info.terrain.dark
+  end
+
+  def room
+    self
+  end
+
+  def starship
+    if @container.nil?
+      nil
+    else
+      $manager.find(@container).starship
+    end
+  end
+
+  def world
+    if @container.nil?
+      nil
+    else
+      $manager.find(@container).area
+    end
+  end
+
   #Checks if a room is indoors.
   def indoors?
-    @info.indoors
+    @info.terrain.indoors
+  end
+
+  def light_sources #Searches the contents of the room for a light source.
+    lights = @inventory.find_all('class', Lantern) #Temporary - Eventually it will need to check for inheritance from a root light object that all lights inherit from.
+    lit_lights = []
+    lights.each do |l|
+      lit_lights << l if l.lit?
+    end
+    players = @inventory.find_all('class', :Player)
+    players.each do |p|
+      lit_lights << p if p.has_light?
+    end
+    lit_lights
+  end
+
+  def light #Makes the room temporarily not dark.
+    @info.terrain.dark = false
+    players = @inventory.find_all("class", :Player)
+    players.each do |player|
+      player.blind = false
+      #player.output("A new source of light casts a warm glow, revealing the room you are standing in.")
+    end
+  end
+
+  def darken #Makes the room dark again.
+    @info.terrain.dark = true if @info.terrain.always_dark
+    players = @inventory.find_all("class", :Player)
+    players.each do |player|
+      player.blind = true
+    end
+  end
+
+  def always_dark?
+    @info.terrain.always_dark
   end
 
   #Add an object to the room.
@@ -47,8 +112,23 @@ class Room < Container
 
     object.container = @game_object_id
 
-    if object.is_a? Player or object.is_a? Mobile
+    if object.is_a? Player or object.is_a? Mobile or object.is_a? Starship
       object.output(self.look(object)) unless object.blind?
+    end
+  end
+
+  def light_source?
+    light_sources.count > 0
+  end
+
+  def calculate_light
+    if self.always_dark?
+      #players = @inventory.find_all("class", :Player)
+      if self.light_source?
+       self.light
+      else
+        self.darken
+      end
     end
   end
 

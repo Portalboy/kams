@@ -1,0 +1,1 @@
+#TODO: Add HasSurface trait, like HasInventory but manages a seperate inventory for ON rather than IN.

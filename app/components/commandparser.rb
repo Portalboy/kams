@@ -8,6 +8,8 @@ module CommandParser
   'date',
   'delete',
   'look',
+  'examine',
+  'inspect',
   'l',
   'get',
   'take',
@@ -38,11 +40,16 @@ module CommandParser
   'unlock',
   'status',
   'stat',
-  'st',
+#  'st',
   'time',
   'typo',
   'who',
-  'write'
+  'write',
+  'use',
+  'man',
+  'light',
+  'unlight',
+  'extinguish'
   ])
 
   @communication = Set.new([
@@ -78,12 +85,40 @@ module CommandParser
   'out',
   'sit',
   'stand',
+  'unman',
   'pose',
   'enter',
   'climb',
   'jump',
   'crawl',
-  'gait'
+  'gait',
+  'p',
+  'po',
+  'port',
+  'a',
+  'af',
+  'aft',
+  'st',
+  'star',
+  'starboard',
+  'f',
+  'fo',
+  'fore',
+  'board',
+  'unboard',
+  'embark',
+  'debark',
+  'disembark',
+  'fly',
+  'takeoff',
+  'land',
+  'drag',
+  'undrag',
+  'leave',
+  'travel',
+  'map',
+  'starmap',
+  'warp'
   ])
 
   @emotes = Set.new([ 'smile',
@@ -125,13 +160,16 @@ module CommandParser
 
   @news = Set.new(['news'])
 
-  @weapon_combat = Set.new(['wield', 'unwield', 'slash', 'block'])
+  @weapon_combat = Set.new(['shoot','fire','aim', 'unaim', 'wield', 'unwield', 'holster', 'unholster', 'slash', 'block'])
 
   @martial_combat = Set.new(['punch', 'kick', 'dodge'])
+  #@martial_combat2 = Set.new(['disarm','trip'])
 
   @magic = Set.new
 
-  @equipment = Set.new(['wear', 'remove'])
+  @equipment = Set.new(['wear', 'remove','unwear'])
+
+  #@starship = Set.new(['use','man'])
 
   @admin = Set.new(['acreate',
   'alook',
@@ -152,6 +190,8 @@ module CommandParser
   'ashow',
   'ainfo',
   'aput',
+  'aputroom',
+  'aputarea',
   'alist',
   'alearn',
   'areas',
@@ -170,7 +210,15 @@ module CommandParser
   'deleteplayer',
   'restart',
   'terrain',
-  'whereis'
+  'whereis',
+  'acstarship',
+  'starships',
+  'acshipmodule',
+  'acmodule',
+  'acworld',
+  'worlds',
+  'apry',
+  'atrait'
   ])
 
   @settings = Set.new(['set'])
@@ -265,11 +313,11 @@ module CommandParser
       e = case input
           when /^delete me please$/i
             { :action => :deleteme }
-          when /^(l|look)$/i
+          when /^(l|look|inspect|examine)$/i
             { :action => :look }
-          when /^(l|look)\s+(in|inside)\s+(.*)$/i
+          when /^(l|look|inspect|examine)\s+(in|inside)\s+(.*)$/i
             { :action => :look, :in => $3 }
-          when /^(l|look)\s+(.*)$/i
+          when /^(l|look|inspect|examine)\s+(.*)$/i
             { :action => :look, :at => $2 }
           when /^lock\s+(.*)$/i
             { :action => :lock, :object => $1 }
@@ -298,16 +346,30 @@ module CommandParser
               :item => $4,
               :count => $3.to_i,
               :container => $5 }
+            when /^put((\s+(\d+)\s+)|\s+)(\w+)\s+on\s+(\w+)$/i
+              { :action => :put_on,
+                :item => $4,
+                :count => $3.to_i,
+                :container => $5 }
           when /^help(.*)$/i
             { :action => :help, :object => $1 }
           when /^(health)$/i
             { :action => :health }
           when /^(satiety|hunger)$/i
             { :action => :satiety }
-          when /^(st|stat|status)$/i
+          #when /^(st|stat|status)$/i
+            when /^(stat|status)$/i   #Temporarily removed 'st' for Starboard instead
             { :action => :status }
           when /^write\s+(.*)/i
             { :action => :write, :target => $1.strip}
+            when /^(use)\s+(.*)/i
+              { :action => :use, :target => $2.strip}
+            when /^(light)\s+(.*)/i
+              { :action => :light, :target => $2.strip}
+            when /^(unlight|extinguish)\s+(.*)/i
+              { :action => :extinguish, :target => $2.strip}
+            when /^(man)\s+(.*)/i
+              { :action => :man, :target => $2.strip}
           when /^(listen|sniff|smell|taste|lick|feel)(\s+(.+))?$/i
             if $1.downcase == "sniff"
               action = :smell
@@ -377,6 +439,10 @@ module CommandParser
       event
     end
 
+    #def parse_starship(input)
+    #  event = Event.new(:ShipCommand, :action => :starship)
+    #end
+
     def parse_movement(input)
       event = Event.new(:Movement, :action => :move)
 
@@ -386,6 +452,8 @@ module CommandParser
         event[:phrase] = $2 if $2
       when /^go\s+(.*)$/i
         event[:direction] = $1.downcase
+        when /^fly\s+(.*)$/i #TODO: Make a separate fly event so people can't use FLY [DIRECTION] to walk around
+          event[:direction] = $1.downcase
       when /^(jump|climb|crawl|enter)\s+(.*)$/i
         event[:action] = :enter
         event[:portal_action] = $1.downcase
@@ -396,14 +464,34 @@ module CommandParser
       when /^pose\s+(.*)$/i
         event[:action] = :pose
         event[:pose] = $1.strip
-      when /^stand$/i
+      when /^(stand)$/i
         event[:action] = :stand
+        when /^(takeoff)/i
+          event[:action] = :takeoff
+        when /^(land)/i
+          event[:action] = :land
+        when /^(unman)/i
+          event[:action] = :stand
+        when /^(unman)\s+(.*)$/i #Temporary, for now unman makes you unman your current station regardless of arguments.
+          event[:action] = :stand
       when /^(jump|crawl|climb|enter)$/i
         input.downcase!
         return nil  ### TODO: handle portal movement
-      when /^(east|west|northeast|northwest|north|southeast|southwest|south|e|w|nw|ne|sw|se|n|s|up|down|u|d|in|out)(\s+\((.*)\))?$/i
+      when /^(east|west|northeast|northwest|north|southeast|southwest|south|e|w|nw|ne|sw|se|n|s|up|down|u|d|in|out|p|po|port|st|star|starboard|a|af|aft|f|fo|fore|board|unboard|embark|debark|disembark)(\s+\((.*)\))?$/i
         event[:direction] = expand_direction $1
         event[:pre] = $3
+        when /^drag\s+(.*)$/i
+          event[:action] = :drag
+        when /^(undrag|leave)\s+(.*)$/i
+          event[:action] = :undrag
+        when /^(travel|map|starmap|warp)$/i
+          event[:action] = :starmap
+        when /^(travel|warp)\s+to\s+(.*)$/i
+          event[:action] = :warp
+          event[:target] = $2
+        when /^(travel|warp)\s+(.*)$/i
+          event[:action] = :warp
+          event[:target] = $2
       else
         return nil
       end
@@ -434,187 +522,234 @@ module CommandParser
       event = Event.new(:Admin)
 
       case input
-      when /^astatus/i
-        event[:action] = :astatus
-      when /^ahelp(.*)$/i
-        event[:action] = :ahelp
-        event[:object] = $1
-      when /^awho/i
-        event[:action] = :awho
-      when /^(ac|acreate)\s+(\w+)\s*(.*)$/i
-        event[:action] = :acreate
-        event[:object] = $2
-        event[:name] = $3.strip
-      when /^acarea\s+(.*)$/i
-        event[:action] = :acarea
-        event[:name] = $1.strip
-      when /^acroom\s+(\w+)\s+(.*)$/i
-        event[:action] = :acroom
-        event[:out_dir] = $1
-        event[:in_dir] = opposite_dir($1)
-        event[:name] = $2
-      when /^acexit\s+(\w+)\s+(.*)$/i
-        event[:action] = :acreate
-        event[:object] = "exit"
-        event[:alt_names] = [$1.strip]
-        event[:args] = [$2.strip]
-      when /^acdoor\s+(\w+)$/i
-        event[:action] = :acdoor
-        event[:direction] = $1
-      when /^acdoor\s+(\w+)\s+(.*)$/i
-        event[:action] = :acdoor
-        event[:direction] = $1.strip
-        event[:exit_room] = $2.strip
-      when /^aconfig(\s+reload)?$/i
-        event[:action] = :aconfig
-        event[:setting] = "reload" if $1
-      when /^aconfig\s+(\w+)\s+(.*)$/i
-        event[:action] = :aconfig
-        event[:setting] = $1
-        event[:value] = $2
-      when /^acportal(\s+(jump|climb|crawl|enter))?(\s+(.*))?$/i
-        event[:action] = :acportal
-        event[:object] = "portal"
-        event[:alt_names] = []
-        event[:portal_action] = $2
-        event[:args] = [$4]
-      when /^portal\s+(.*?)\s+(action|exit|entrance|portal)\s+(.*)$/i
-        event[:action] = :portal
-        event[:object] = $1
-        event[:setting] = $2.downcase
-        event[:value] = $3.strip
-      when /^acprop\s+(.*)$/i
-        event[:action] = :acreate
-        event[:object] = "prop"
-        event[:generic] = $1
-      when /^adelete\s+(.*)$/i
-        event[:action] = :adelete
-        event[:object] = $1
-      when /^deleteplayer\s+(\w+)$/i
-        event[:action] = :delete_player
-        event[:object] = $1.downcase
-      when /^adesc\s+inroom\s+(.*?)\s+(.*)$/i
-        event[:action] = :adesc
-        event[:object] = $1
-        event[:inroom] = true
-        event[:desc] = $2
-      when /^adesc\s+(.*?)\s+(.*)$/i
-        event[:action] = :adesc
-        event[:object] = $1
-        event[:desc] = $2
-      when /^ahide\s+(.*)$/i
-        event[:action] = :ahide
-        event[:object] = $1
-        event[:hide] = true
-      when /^ashow\s+(.*)$/i
-        event[:action] = :ahide
-        event[:object] = $1
-        event[:hide] = false
-      when /^ainfo\s+set\s+(.+)\s+@((\w|\.|\_)+)\s+(.*?)$/i
-        event[:action] = :ainfo
-        event[:command] = "set"
-        event[:object] = $1
-        event[:attrib] = $2
-        event[:value] = $4
-      when /^ainfo\s+(del|delete)\s+(.+)\s+@((\w|\.|\_)+)$/i
-        event[:action] = :ainfo
-        event[:command] = "delete"
-        event[:object] = $2
-        event[:attrib] = $3
-      when /^ainfo\s+(show|clear)\s+(.*)$/i
-        event[:action] = :ainfo
-        event[:object] = $2
-        event[:command] = $1
-      when /^alook$/i
-        event[:action] = :alook
-      when /^alook\s+(.*)$/i
-        event[:action] = :alook
-        event[:at] = $1
-      when /^alist$/i
-        event[:action] = :alist
-      when /^alist\s+(@\w+|class)\s+(.*)/i
-        event[:action] = :alist
-        event[:attrib] = $2
-        event[:match] = $1
-      when /^aset\s+(.+?)\s+(@\w+|smell|feel|texture|taste|sound|listen)\s+(.*)$/i
-        event[:action] = :aset
-        event[:object] = $1
-        event[:attribute] = $2
-        event[:value] = $3
-      when /^aset!\s+(.+?)\s+(@\w+|smell|feel|texture|taste|sound|listen)\s+(.*)$/i
-        event[:action] = :aset
-        event[:object] = $1
-        event[:attribute] = $2
-        event[:value] = $3
-        event[:force] = true
-      when /^aput\s+(.*?)\s+in\s+(.*?)$/i
-        event[:action] = :aput
-        event[:object] = $1
-        event[:in] = $2
-      when /^areas$/i
-        event[:action] = :areas
-      when /^areload\s+(.*)$/i
-        event[:action] = :areload
-        event[:object] = $1
-      when /^areact\s+load\s+(.*?)\s+(\w+)$/i
-        event[:action] = :areaction
-        event[:object] = $1
-        event[:command] = "load"
-        event[:file] = $2
-      when /^areact\s+(add|delete)\s+(.*?)\s+(\w+)$/i
-        event[:action] = :areaction
-        event[:object] = $2
-        event[:command] = $1
-        event[:action_name] = $3
-      when /^areact\s+(reload|clear|show)\s+(.*?)$/i
-        event[:action] = :areaction
-        event[:object] = $2
-        event[:command] = $1
-      when /^alog\s+(\w+)(\s+(\d+))?$/i
-        event[:action] = :alog
-        event[:command] = $1
-        event[:value] = $3.downcase if $3
-      when /^acopy\s+(.*)$/i
-        event[:action] = :acopy
-        event[:object] = $1
-      when /^alearn\s+(\w+)$/i
-        event[:action] = :alearn
-        event[:skill] = $1
-      when /^ateach\s+(\w+)\s+(\w+)$/i
-        event[:action] = :ateach
-        event[:target] = $1
-        event[:skill] = $2
-      when /^aforce\s+(.*?)\s+(.*)$/i
-        event[:action] = :aforce
-        event[:target] = $1
-        event[:command] = $2
-      when /^(acomm|acomment)\s+(.*?)\s+(.*)$/i
-        event[:action] = :acomment
-        event[:target] = $2
-        event[:comment] = $3
-      when /^awatch\s+((start|stop)\s+)?(.*)$/i
-        event[:action] = :awatch
-        event[:target] = $3.downcase if $3
-        event[:command] = $2.downcase if $2
-      when /^asave$/i
-        event[:action] = :asave
-      when /^restart$/i
-        event[:action] = :restart
-      when /^terrain\s+area\s+(.*)$/i
-        event[:action] = :terrain
-        event[:target] = "area"
-        event[:value] = $1
-      when /^terrain\s+(room|here)\s+(type|indoors|underwater|water)\s+(.*)$/
-        event[:action] = :terrain
-        event[:target] = "room"
-        event[:setting] = $2.downcase
-        event[:value] = $3
-      when /^whereis\s(.*)$/
-        event[:action] = :whereis
-        event[:object] = $1
-      else
-        return nil
-      end
+        when /^astatus/i
+          event[:action] = :astatus
+        when /^ahelp(.*)$/i
+          event[:action] = :ahelp
+          event[:object] = $1
+        when /^awho/i
+          event[:action] = :awho
+        when /^(ac|acreate)\s+(\w+)\s*(.*)$/i
+          event[:action] = :acreate
+          event[:object] = $2
+          event[:name] = $3.strip
+        when /^acarea\s+(.*)$/i
+          event[:action] = :acarea
+          event[:name] = $1.strip
+        when /^acroom\s+(\w+)\s+(.*)$/i
+          event[:action] = :acroom
+          event[:out_dir] = $1
+          event[:in_dir] = opposite_dir($1)
+          event[:name] = $2
+        when /^acstarship\s+(.*)$/i
+          event[:action] = :acstarship
+          event[:name] = $1.strip
+        #when /^acshipmodule\s+(\w+)\s+(.*)$/i
+          #event[:action] = :acshipmodule
+          #event[:out_dir] = $1
+          #event[:in_dir] = opposite_dir($1)
+          #event[:module_type] = $2
+          #event[:name] = $3
+        when /^(acshipmodule|acmodule)\s+(\w+)\s*(.*)$/i
+          event[:action] = :acshipmodule
+          event[:out_dir] = $2
+          event[:in_dir] = opposite_dir($2)
+          event[:name] = $3
+        when /^acworld\s+(.*)$/i
+          event[:action] = :acworld
+          event[:name] = $1.strip
+        when /^acexit\s+(\w+)\s+(.*)$/i
+          event[:action] = :acreate
+          event[:object] = "exit"
+          event[:alt_names] = [$1.strip]
+          event[:args] = [$2.strip]
+        #when /^acexit\s+(\w+)\s+(.*)\s+(.*)$/i
+        #  event[:action] = :acreate
+        #  event[:object] = "exit"
+        #  event[:alt_names] = [$1.strip]
+        #  event[:args] = [$2.strip]
+        #  event[:shiponly] =
+        when /^acdoor\s+(\w+)$/i
+          event[:action] = :acdoor
+          event[:direction] = $1
+        when /^acdoor\s+(\w+)\s+(.*)$/i
+          event[:action] = :acdoor
+          event[:direction] = $1.strip
+          event[:exit_room] = $2.strip
+        when /^aconfig(\s+reload)?$/i
+          event[:action] = :aconfig
+          event[:setting] = "reload" if $1
+        when /^aconfig\s+(\w+)\s+(.*)$/i
+          event[:action] = :aconfig
+          event[:setting] = $1
+          event[:value] = $2
+        when /^acportal(\s+(jump|climb|crawl|enter))?(\s+(.*))?$/i
+          event[:action] = :acportal
+          event[:object] = "portal"
+          event[:alt_names] = []
+          event[:portal_action] = $2
+          event[:args] = [$4]
+        when /^portal\s+(.*?)\s+(action|exit|entrance|portal)\s+(.*)$/i
+          event[:action] = :portal
+          event[:object] = $1
+          event[:setting] = $2.downcase
+          event[:value] = $3.strip
+        when /^acprop\s+(.*)$/i
+          event[:action] = :acreate
+          event[:object] = "prop"
+          event[:generic] = $1
+        when /^adelete\s+(.*)$/i
+          event[:action] = :adelete
+          event[:object] = $1
+        when /^deleteplayer\s+(\w+)$/i
+          event[:action] = :delete_player
+          event[:object] = $1.downcase
+        when /^adesc\s+inroom\s+(.*?)\s+(.*)$/i
+          event[:action] = :adesc
+          event[:object] = $1
+          event[:inroom] = true
+          event[:desc] = $2
+        when /^adesc\s+dark\s+(.*?)\s+(.*)$/i
+          event[:action] = :adesc
+          event[:object] = $1
+          event[:dark] = true
+          event[:desc] = $2
+        when /^adesc\s+(.*?)\s+(.*)$/i
+          event[:action] = :adesc
+          event[:object] = $1
+          event[:desc] = $2
+        when /^ahide\s+(.*)$/i
+          event[:action] = :ahide
+          event[:object] = $1
+          event[:hide] = true
+        when /^ashow\s+(.*)$/i
+          event[:action] = :ahide
+          event[:object] = $1
+          event[:hide] = false
+        when /^ainfo\s+set\s+(.+)\s+@((\w|\.|\_)+)\s+(.*?)$/i
+          event[:action] = :ainfo
+          event[:command] = "set"
+          event[:object] = $1
+          event[:attrib] = $2
+          event[:value] = $4
+        when /^ainfo\s+(del|delete)\s+(.+)\s+@((\w|\.|\_)+)$/i
+          event[:action] = :ainfo
+          event[:command] = "delete"
+          event[:object] = $2
+          event[:attrib] = $3
+        when /^ainfo\s+(show|clear)\s+(.*)$/i
+          event[:action] = :ainfo
+          event[:object] = $2
+          event[:command] = $1
+        when /^alook$/i
+          event[:action] = :alook
+        when /^alook\s+(.*)$/i
+          event[:action] = :alook
+          event[:at] = $1
+        when /^alist$/i
+          event[:action] = :alist
+        when /^alist\s+(@\w+|class)\s+(.*)/i
+          event[:action] = :alist
+          event[:attrib] = $2
+          event[:match] = $1
+        when /^aset\s+(.+?)\s+(@\w+|smell|feel|texture|taste|sound|listen)\s+(.*)$/i
+          event[:action] = :aset
+          event[:object] = $1
+          event[:attribute] = $2
+          event[:value] = $3
+        when /^aset!\s+(.+?)\s+(@\w+|smell|feel|texture|taste|sound|listen)\s+(.*)$/i
+          event[:action] = :aset
+          event[:object] = $1
+          event[:attribute] = $2
+          event[:value] = $3
+          event[:force] = true
+        when /^apry/i
+          event[:action] = :apry
+        when /^aput\s+(.*?)\s+in\s+(.*?)$/i
+          event[:action] = :aput
+          event[:object] = $1
+          event[:in] = $2
+        when /^aputroom\s+(.*?)\s+in\s+(.*?)$/i
+          event[:action] = :aputroom
+          event[:object] = $1
+          event[:in] = $2
+        when /^aputarea\s+(.*?)\s+in\s+(.*?)$/i
+          event[:action] = :aputarea
+          event[:object] = $1
+          event[:in] = $2
+        when /^areas$/i
+          event[:action] = :areas
+        when /^worlds$/i
+          event[:action] = :worlds
+        when /^starships$/i
+          event[:action] = :starships
+        when /^areload\s+(.*)$/i
+          event[:action] = :areload
+          event[:object] = $1
+        when /^areact\s+load\s+(.*?)\s+(\w+)$/i
+          event[:action] = :areaction
+          event[:object] = $1
+          event[:command] = "load"
+          event[:file] = $2
+        when /^areact\s+(add|delete)\s+(.*?)\s+(\w+)$/i
+          event[:action] = :areaction
+          event[:object] = $2
+          event[:command] = $1
+          event[:action_name] = $3
+        when /^areact\s+(reload|clear|show)\s+(.*?)$/i
+          event[:action] = :areaction
+          event[:object] = $2
+          event[:command] = $1
+        when /^alog\s+(\w+)(\s+(\d+))?$/i
+          event[:action] = :alog
+          event[:command] = $1
+          event[:value] = $3.downcase if $3
+        when /^acopy\s+(.*)$/i
+          event[:action] = :acopy
+          event[:object] = $1
+        when /^alearn\s+(\w+)$/i
+          event[:action] = :alearn
+          event[:skill] = $1
+        when /^ateach\s+(\w+)\s+(\w+)$/i
+          event[:action] = :ateach
+          event[:target] = $1
+          event[:skill] = $2
+        when /^aforce\s+(.*?)\s+(.*)$/i
+          event[:action] = :aforce
+          event[:target] = $1
+          event[:command] = $2
+        when /^(acomm|acomment)\s+(.*?)\s+(.*)$/i
+          event[:action] = :acomment
+          event[:target] = $2
+          event[:comment] = $3
+        when /^awatch\s+((start|stop)\s+)?(.*)$/i
+          event[:action] = :awatch
+          event[:target] = $3.downcase if $3
+          event[:command] = $2.downcase if $2
+        when /^asave$/i
+          event[:action] = :asave
+        when /^restart$/i
+          event[:action] = :restart
+        when /^terrain\s+area\s+(.*)$/i
+          event[:action] = :terrain
+          event[:target] = "area"
+          event[:value] = $1
+        when /^terrain\s+(room|here)\s+(type|indoors|underwater|water)\s+(.*)$/
+          event[:action] = :terrain
+          event[:target] = "room"
+          event[:setting] = $2.downcase
+          event[:value] = $3
+        when /^whereis\s(.*)$/
+          event[:action] = :whereis
+          event[:object] = $1
+        when /^atrait\s+(.*?)\s+ADD\s+(.*)$/i #This hasn't been tested
+          event[:action] = atrait
+          event[:object] = $1
+          event[:trait] = $2
+          event[:command] = "add"
+        else
+          return nil
+        end
 
       event
     end
@@ -649,23 +784,41 @@ module CommandParser
       event = Event.new(:WeaponCombat)
 
       case input
-      when /^wield\s+(.*?)(\s+(\w+))?$/i
-        event[:action] = :wield
-        event[:weapon] = $1
-        event[:side] = $3
-      when /^unwield(\s+(.*))?$/i
-        event[:action] = :unwield
-        event[:weapon] = $2
-      when /^slash$/i
-        event[:action] = :slash
-      when /^slash\s+(.*)$/i
-        event[:action] = :slash
-        event[:target] = $1
-      when /^block(\s+(.*))?$/i
-        event[:action] = :simple_block
-        event[:target] = $2
-      else
-        return nil
+        when /^aim$/i #Aim with no arguments
+          event[:action] = :aim
+        when /^aim\s+(.*)$/i #Aim with an argument
+          event[:action] = :aim
+          event[:target] = $1
+        when /^aim\s+at\s+(.*)$/i #Same as above but for people who want AIM AT Bob instead of AIM Bob
+          event[:action] = :aim
+          event[:target] = $1
+        when /^unaim$/i #Stop aiming
+          event[:action] = :unaim
+        when /^(shoot|fire)$/i #Shoot with no arguments
+          event[:action] = :shoot
+        when /^(shoot|fire)\s+at\s+(.*)$/i #SHOOT AT [argument]
+          event[:action] = :shoot
+          event[:target] = $2
+        when /^shoot\s+(.*)$/i #Shoot with an argument (but not Fire, since 'FIRE Bob' doesn't make sense unless you're playing Boss Simulator).
+          event[:action] = :shoot
+          event[:target] = $1
+        when /^(wield|unholster)\s+(.*?)(\s+(\w+))?$/i
+          event[:action] = :wield
+          event[:weapon] = $2
+          event[:side] = $4
+        when /^(unwield|holster)(\s+(.*))?$/i
+          event[:action] = :unwield
+          event[:weapon] = $3
+        when /^slash$/i
+          event[:action] = :slash
+        when /^slash\s+(.*)$/i
+          event[:action] = :slash
+          event[:target] = $1
+        when /^block(\s+(.*))?$/i
+          event[:action] = :simple_block
+          event[:target] = $2
+        else
+          return nil
       end
 
       event
@@ -718,24 +871,53 @@ module CommandParser
       event = Event.new(:MartialCombat)
 
       case input
-      when /^punch$/i
-        event.action = :punch
-      when /^punch\s+(.*)$/i
-        event.action = :punch
-        event.target = $1
-      when /^kick$/i
-        event.action = :kick
-      when /^kick\s+(.*)$/i
-        event.action = :kick
-        event.target = $1
-      when /^dodge(\s+(.*))?$/i
-        event.action = :simple_dodge
-        event.target = $2 if $2
-      else
-        return nil
+        when /^punch$/i
+          event.action = :punch
+        when /^punch\s+(.*)$/i
+          event.action = :punch
+          event.target = $1
+        when /^kick$/i
+          event.action = :kick
+        when /^kick\s+(.*)$/i
+          event.action = :kick
+          event.target = $1
+        when /^dodge(\s+(.*))?$/i
+          event.action = :simple_dodge
+          event.target = $2 if $2
+        else
+          return nil
       end
 
       event
     end
+
+=begin ###MARTIAL COMBAT 2 IS WIP###
+    def parse_martial_combat2(input)
+      event = Event.new(:MartialCombat2)
+
+      case input
+        when /^disarm$/i
+          event.action = :disarm
+        when /^disarm\s+(.*)$/i
+          event.action = :disarm
+          event.target = $1
+        when /^trip$/i
+          event.action = :trip
+        when /^trip\s+(.*)$/i
+          event.action = :trip
+          event.target = $1
+        when /^jump$/i
+          event.action = :jump_dodge
+        when /^jump\s+(.*)$/i
+          event.action = :jump_dodge
+          event.target = $1
+        else
+          return nil
+      end
+
+      event
+    end
+=end
+
   end
 end

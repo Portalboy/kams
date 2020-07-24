@@ -164,6 +164,15 @@ module Combat
       end
     end
 
+    def aiming? player
+      if player.aiming
+        true
+      else
+        player.output "You must aim before you do that."
+        false
+      end
+    end
+
     #Checks if the target is valid (alive, etc.)
     #Gives message to player if invalid.
     def valid_target? player, target
@@ -195,6 +204,42 @@ module Combat
       else
         true
       end
+    end
+
+    def gun_ready? player
+      if not player.balance and not Combat.aiming? player
+        player.output "You cannot shoot again yet."
+        false
+      elsif player.blind?
+        player.output "You cannot see who you are trying to attack!"
+        false
+      else
+        true
+      end
+    end
+
+    def can_shoot_at?(player, target)
+      if Combat.gun_ready? player
+        if player.aiming?
+          if Combat.aiming_at? player, target
+            true
+          else
+            player.output "You are still aiming at #{target.name}."
+            false
+          end
+        elsif not player.balance
+          player.output "You are not ready to fire again."
+          false
+        else
+          true
+        end
+      else
+        false
+      end #Todo: Make this horrible method less confusing
+    end
+
+    def aiming_at? player, target
+      player.aiming_at == target.goid
     end
 
     #Finds a target for the given event. Unless suppress_output is true,

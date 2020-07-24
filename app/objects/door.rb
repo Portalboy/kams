@@ -70,6 +70,14 @@ class Door < Exit
     end
   end
 
+  def leverpull(event)
+    if @open
+      open(event)
+    else
+      close(event)
+    end
+  end
+
   #Connects this door to another door so it works correctly.
   #Accepts either a Door or a String. If door is a Door, then it automatically connects the other door to itself.
   #Otherwise, you have to call connect_to for each Door. If the other Door is already connected, that connection shall remain.

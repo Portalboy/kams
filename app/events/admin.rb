@@ -52,6 +52,98 @@ module Admin
       player.output "Moved #{object} into #{container}"
     end
 
+    #Easier aput, for putting an area into a world.
+    def aputarea(event, player, room)
+      if event[:object].is_a? GameObject
+        object = event[:object]
+      else
+        event[:object] = player.container if event[:object].downcase == "here"
+        object = find_object(event[:object], event)
+      end
+
+      container = find_object(event[:in], event)
+
+      if object.nil?
+        player.output "Cannot find #{event[:object]} to move."
+        return
+      elsif event[:in] == "!world"
+        container = $manager.find object.container
+        container.inventory.remove(object) unless container.nil?
+        object.container = nil
+        player.output "Removed #{object} from any containers."
+        return
+      elsif event[:in].downcase == "here"
+        container = $manager.find player.container
+        if container.nil?
+          player.output "Cannot find #{event[:in]} "
+          return
+        end
+      elsif container.nil?
+        player.output "Cannot find #{event[:in]} "
+        return
+      end
+
+      if not object.container.nil?
+        current_container = $manager.find object.container
+        current_container.inventory.remove(object) if current_container
+      end
+
+      if container.is_a? Container
+        container.add object
+      else
+        container.inventory.add(object)
+        object.container = container.goid
+      end
+
+      player.output "Moved #{object} into #{container}"
+    end
+
+    #Easier aput, puts room into area.
+    def aputroom(event, player, room)
+      if event[:object].is_a? GameObject
+        object = event[:object]
+      else
+        event[:object] = player.container if event[:object].downcase == "here"
+        object = find_object(event[:object], event)
+      end
+
+      container = find_object(event[:in], event)
+
+      if object.nil?
+        player.output "Cannot find #{event[:object]} to move."
+        return
+      elsif event[:in] == "!game"
+        container = $manager.find object.container
+        container.inventory.remove(object) unless container.nil?
+        object.container = nil
+        player.output "Removed #{object} from any containers."
+        return
+      elsif event[:in].downcase == "here"
+        container = $manager.find player.container
+        if container.nil?
+          player.output "Cannot find #{event[:in]} "
+          return
+        end
+      elsif container.nil?
+        player.output "Cannot find #{event[:in]} "
+        return
+      end
+
+      if not object.container.nil?
+        current_container = $manager.find object.container
+        current_container.inventory.remove(object) if current_container
+      end
+
+      if container.is_a? Container
+        container.add object
+      else
+        container.inventory.add(object)
+        object.container = container.goid
+      end
+
+      player.output "Moved #{object} into #{container}"
+    end
+
     #Loads/Reloads a .rb file. Do not provide the extension.
     #
     # ARELOAD [FILENAME]
@@ -101,6 +193,7 @@ module Admin
       player.output "Created: #{object}"
       object
     end
+    #TODO: Create a command specifically for creating subsystem. Like ACREATE but takes the specific subsystem type.
 
     def acdoor event, player, room
 
@@ -214,8 +307,18 @@ module Admin
 
     #Create a new area.
     def acarea(event, player, room)
-      area = $manager.create_object(Area, nil, nil, {:@name => event[:name]})
+      world = nil
+      if room.world
+        world = $manager.get_object(room.world)
+      end
+
+      area = $manager.create_object(Area, world, nil, {:@name => event[:name]})
       player.output "Created: #{area}"
+    end
+
+    def acworld(event, player, room)
+      world = $manager.create_object(World, nil, nil, {:@name => event[:name]})
+      player.output "Created: #{world}"
     end
 
     #Create room, with an exit to the new room and back to the current room.
@@ -239,6 +342,134 @@ module Admin
 
     end
 
+
+    ###BEGIN CUSTOM STARSHIP LOGIC###
+    #Create a new starship.
+    def acstarship(event, player, room)
+      creation_room = nil
+      if room
+        creation_room = room #TEMPORARY! DONE: Make starship generate in the Room/Area/World the player is in when they call this
+      end
+
+      #TODO Fix this, it's putting the shipmodule in room, not starship.
+      #This appears to be because Starship is being created with the same GOID as room, thus not actually being created.
+
+      new_starship = $manager.create_object(Starship, nil, nil, {:@name => event[:name], :@landed_in => room.goid})
+      new_room = $manager.create_object(Shipmodule, new_starship, nil, :@name => "Boarding Room")
+      out_exit = $manager.create_object(StarshipExit, room, new_room.goid, {:@note => "Landing zone to #{new_starship.name}", :@alt_names => ["embark"], :@landing_exit => true, :@linked_ship => new_starship.name})
+      in_exit = $manager.create_object(StarshipExit, new_room, room.goid, {:@note => "#{new_starship.name} to Landing zone", :@alt_names => ["disembark"], :@landing_exit => true, :@linked_ship => new_starship.name})
+      new_starship.linked_exits = [out_exit.goid, in_exit.goid]
+      new_starship.boarding_room = new_room.goid
+
+      player.output "Created: #{new_starship}."
+      player.output "Created: #{new_room}."
+      player.output "Created: #{out_exit}, linked to #{new_room.goid}"
+      player.output "Created: #{in_exit}"
+    end
+=begin #This wasn't working. I was trying to make the ship module a special kind of object that inherits from the module class. Instead, made all ship modules generic and contained stations in objects.
+    #Create ship module, with an exit to the new module room and back to the current room.
+    #Modules are like rooms, but they have extra logic added for things like Hull, Systems, etc.
+    #TODO: Add logic for Hull, systems, etc.
+    def acshipmodule(event, player, shipmodule)
+
+      ###BEGIN BORROWED CODE FROM ACREATE###
+      class_name = event[:module_type]
+
+      class_name[0,1] = class_name[0,1].capitalize
+
+      if Object.const_defined? class_name
+        klass = Object.const_get(class_name)
+      else
+        player.output "No such thing. Sorry."
+        return
+      end
+
+      if not klass <= GameObject  or klass == Player
+        player.output "You cannot create a #{klass.class}."
+        return
+      end
+
+      vars = {}
+      vars[:@name] = event[:name] if event[:name]
+      vars[:@alt_names] = event[:alt_names] if event[:alt_names]
+      vars[:@generic] = event[:generic] if event[:generic]
+      args = event[:args]
+
+      object = $manager.create_object(klass, starship, args, vars)
+      out_exit = $manager.create_object(Exit, shipmodule, new_shipmodule.goid, :@alt_names => [event[:out_dir]])
+      in_exit = $manager.create_object(Exit, new_shipmodule, shipmodule.goid, :@alt_names => [event[:in_dir]])
+      ###END OF BORROWING FROM ACREATE###
+
+      #starship = nil #Used in the later shipmodule generic constructor
+      if shipmodule.container
+        #starship = $manager.get_object(shipmodule.container) #Used in the later shipmodule generic constructor
+      end
+
+      #new_shipmodule = $manager.create_object(Shipmodule, starship, nil, :@name => event[:name])
+      #The above is creating the Shipmodule generic.
+      #out_exit = $manager.create_object(Exit, shipmodule, new_shipmodule.goid, :@alt_names => [event[:out_dir]])
+      #in_exit = $manager.create_object(Exit, new_shipmodule, shipmodule.goid, :@alt_names => [event[:in_dir]])
+
+      #player.output "Created: #{new_shipmodule}" #Returns null if generic shipmodule constructor is commented out
+      player.output "Created: #{out_exit}"
+      player.output "Created: #{in_exit}"
+
+      if shipmodule
+        shipmodule.output "There is a small flash of light as a new ship module appears to the #{event[:out_dir]}."
+      end
+
+      player.output "Created: #{object}"
+      object
+
+    end
+=end
+#End of old createmodule command
+
+    def acshipmodule(event, player, room)
+      starship = nil
+      if room.container
+        starship = $manager.get_object(room.container)
+      end
+
+      new_room = $manager.create_object(Shipmodule, starship, nil, :@name => event[:name])
+      out_exit = $manager.create_object(Exit, room, new_room.goid, :@alt_names => [event[:out_dir]])
+      in_exit = $manager.create_object(Exit, new_room, room.goid, :@alt_names => [event[:in_dir]])
+
+      player.output "Created: #{new_room}"
+      player.output "room.starship: #{room.starship}, starship: #{starship}"
+      player.output "Created: #{out_exit}"
+      player.output "Created: #{in_exit}"
+
+      if room
+        room.output "There is a small flash of light as a new ship module appears to the #{event[:out_dir]}."
+      end
+
+    end
+
+
+    #Lists existing starships
+    def starships(event, player, room)
+      starships = $manager.find_all('class', Starship)
+
+      if starships.empty?
+        player.output "There are no starships."
+        return
+      end
+
+      player.output starships.map {|a| "#{a.name} -  #{a.inventory.find_all('class', Room).length} rooms (#{a.info.terrain.area_type})" }
+    end
+
+    def worlds(event, player, room)
+      worlds = $manager.find_all('class', World)
+
+      if worlds.empty?
+        player.output "There are no worlds."
+        return
+      end
+
+      player.output worlds.map {|a| "#{a.name} -  #{a.inventory.find_all('class', Area).length} Areas, #{a.inventory.find_all('class', Starship).length} Starships (#{a.info.terrain.world_type})" }
+    end
+###END CUSTOM STARSHIP LOGIC###
     #Sets a server configuration option.
     def aconfig(event, player, room)
 
@@ -340,10 +571,19 @@ module Admin
           object.show_in_look= event[:desc]
           player.output "The room will show #{object.show_in_look}"
         end
+      elsif event[:dark]
+        if event[:desc].nil? or event[:desc].downcase == "false"
+          object.dark_desc = false
+          player.output "#{object.name} will not be shown in the room description."
+        else
+          object.dark_desc = event[:desc]
+          player.output "#{object.name} will look like this in the dark: #{object.dark_desc}"
+        end
       else
         object.instance_variable_set(:@short_desc, event[:desc])
         player.output "#{object.name} now looks like:\n#{object.short_desc}"
       end
+
     end
 
     #ASHOW and AHIDE. Either hides an object by setting its show_in_look to "" or shows it by setting
@@ -463,6 +703,11 @@ module Admin
           whereis(event, player, room)
         end
       end
+    end
+
+    def apry(event, player, room)
+      require 'pry'
+      binding.pry
     end
 
     #Sets object variables.
@@ -1067,4 +1312,34 @@ module Admin
       $manager.find(name, event[:player]) || $manager.find(name, event[:player].container) || $manager.get_object(name)
     end
   end
+end
+
+#TODO: Add a command like ATRAIT that will include a module into the given object's singleton class.
+#I.E.
+=begin
+#############INPUT#################
+<H100|> ATRAIT table ADD HasInventory
+###########COMMANDPARSER###########
+$1 == table
+$2 == HasInventory
+event[:action] = :add_trait
+event[:object] = $1
+event[:module] = $2
+###############EVENT################
+object = $manager.find(event[:object])
+class << object
+  include event[:module]
+end
+####################################
+=end
+
+def atrait(event, player, room) #This hasn't been tested
+
+  object = $manager.find(event[:object])
+  object.extend event[:trait]
+  event[:to_player] = "Closing your eyes, you focus on #{object.name}, adding the #{event[:trait]} trait to it."
+  event[:to_other] = "#{player.name} looks at #{object.name} and closes #{player.pronoun[:possessive]}, clearly concentrating."
+  event[:to_blind_other] = "You can barely perceive a low buzz, like a bass tone. It's almost inaudible, though."
+  room.out_event event
+
 end

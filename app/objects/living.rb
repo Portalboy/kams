@@ -8,13 +8,14 @@ class LivingObject < GameObject
   include Position
   include HasInventory
 
-  attr_reader :equipment, :balance
+  attr_reader :equipment, :balance, :aiming
   attr_accessor :last_target, :alive
 
   def initialize *args
     super
     @equipment ||= Equipment.new(self.goid)
     @balance = true
+    @aiming = false
     @alive = true
     @last_target = nil
     info.stats ||= Info.new
@@ -51,6 +52,14 @@ class LivingObject < GameObject
     else
       false
     end
+  end
+
+  def aiming?
+    @aiming
+  end
+
+  def aiming_at
+    @aiming_at
   end
 
   #Takes damage.

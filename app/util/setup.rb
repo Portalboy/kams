@@ -103,7 +103,9 @@ def reset_storage
 
   $manager = Manager.new
   $manager.create_object(Room, nil, nil, :@name => "GarbageRoom")
-  area = $manager.create_object(Area, nil, nil, :@name => "an Expansive Wilderness")
+  representor = $manager.create_object(Representor, nil, @name => "Earth's Orbit")
+  world = $manager.create_object(World, representor, nil, :@name => "Earth")
+  area = $manager.create_object(Area, world, nil, :@name => "an Expansive Wilderness")
   area.info.terrain.area_type = :grassland
   room = $manager.create_object(Room, area, nil,  :@name => "A wide-open field", :@short_desc => "Endless possibilities stretch out to the horizon.")
   room.info.terrain.room_type = :grassland

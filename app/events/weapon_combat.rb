@@ -49,6 +49,176 @@ module WeaponCombat
 
     end
 
+    def aim(event, player, room)
+
+      return if not Combat.ready? player
+
+      weapon = get_weapon(player, :aim)
+      if weapon.nil?
+        player.output "You are not wielding a weapon that requires aiming."
+        return
+      end
+
+      target = (event.target && room.find(event.target)) || room.find(player.last_target)
+
+      if target.nil?
+        player.output "Who are you trying to attack?"
+        return
+      else
+        return unless Combat.valid_target? player, target
+      end
+
+      player.last_target = target.goid
+
+      event.target = target
+
+      event[:to_other] = "#{player.name} aims #{weapon.name} at #{target.name}."
+      event[:to_target] = "#{player.name} aims #{weapon.name} at you."
+      event[:to_player] = "You put your eye to #{weapon.name}'s sights, carefully aiming it at #{target.name}."
+      event[:attack_weapon] = weapon
+      event[:blockable] = false
+
+      player.balance = false
+      player.aiming = true
+      player.aiming_at = target.goid
+      player.info.in_combat = true
+      target.info.in_combat = true
+
+      room.out_event event
+      #Combat.future_event event
+
+    end
+
+    def reaim(event, player, room) #Like aim, but for just after shooting (doesn't check for balance)
+
+      weapon = get_weapon(player, :aim)
+      target = (event.target && room.find(event.target)) || room.find(player.last_target)
+
+      if target.nil?
+        player.output "Who are you trying to attack?"
+        return
+      else
+        return unless Combat.valid_target? player, target
+      end
+
+      player.last_target = target.goid
+
+      event.target = target
+
+      event[:to_player] = "You stabilize #{weapon.name}, aiming it at #{target.name}."
+      event[:attack_weapon] = weapon
+      event[:blockable] = false
+
+      player.balance = false
+      player.aiming = true
+      player.aiming_at = target.goid
+      player.info.in_combat = true
+      target.info.in_combat = true
+
+      room.out_event event
+      #Combat.future_event event
+
+    end
+
+    def shoot(event, player, room)
+      target = (event.target && room.find(event.target)) || room.find(player.last_target)
+      weapon = get_weapon(player, :aim)
+      if Combat.aiming? player
+        return unless Combat.can_shoot_at? player, target
+        event[:action] = :shoot
+        number_of_guns = get_weapons(player, :shoot).size
+        event[:attacks] = number_of_guns
+        #event[:to_player] = "#{weapon.sound[:shoot]}! Your shot hits #{target.name}'s torso." #TODO: Fix shooting while aimed
+        #event[:to_other] = "#You hear a #{weapon.sound[:shoot]}! #{player.name} shoots #{target.name}'s torso."
+        event[:to_player] = "Pew! Your shot hits #{target.name}'s torso." #TODO: Fix shooting while aimed
+        event[:to_other] = "#{target.name} is hit in the torso by #{player.name}'s #{weapon.name}."
+        player.aiming = false
+        event[:attacks].times do
+          room.out_event event
+        end
+
+
+
+        event[:action] = :reaim
+        event[:to_player] = "You restabilize your aim at #{target.name}."
+        event[:to_other] = nil
+        Combat.future_event(event)
+      else
+      if Combat.gun_ready? player #Shooting without aiming
+      return unless Combat.gun_ready? player
+
+      weapon = get_weapon(player, :shoot)
+      if weapon.nil?
+        player.output "You are not wielding a weapon you can shoot with."
+        return
+      end
+
+
+
+      if target.nil?
+        player.output "Who are you trying to attack?"
+        return
+      else
+        return unless Combat.valid_target? player, target
+      end
+
+      player.last_target = target.goid
+
+      event.target = target
+
+      event[:to_other] = "#{weapon.name} cracks loudly as #{player.name} haphazardly fires it at #{target.name}."
+      event[:to_target] = "#{weapon.name} cracks loudly as #{player.name} haphazardly fires it at you."
+      event[:to_player] = "#{weapon.name} cracks loudly as you haphazardly fire it at #{target.name}."
+      event[:attack_weapon] = weapon
+      event[:blockable] = false #Todo: Make this blockable by those with fantastic sword reflexes
+      event[:dodgable] = true
+
+      player.balance = false
+      player.info.in_combat = true
+      target.info.in_combat = true
+
+      room.out_event event
+
+      number_of_guns = get_weapons(player, :shoot).size
+
+      event[:action] = :weapon_hit
+      event[:attacks] = number_of_guns
+      event[:to_other] = "#{player.name}'s #{weapon.name} hits #{target.name}'s torso."
+      event[:to_target] = "#{player.name} hits you in the chest with #{weapon.name}."
+      event[:to_player] = "You hit #{target.name}'s torso with #{weapon.name}."
+
+      #if number_of_guns > 1
+      #  event2 = event
+      #  room.out_event event
+      #end
+
+      event[:attacks].times do
+        Combat.future_event event
+      end
+
+      Combat.future_event event
+      else #Shooting without aiming?
+        #if Combat.aiming? player
+          #TODO: Make aiming provide benefits
+          #TODO: Fix aiming
+        #end
+      end
+      end
+    end
+
+    def unaim(event, player, room)
+      target = (event.target && room.find(event.target)) || room.find(player.last_target)
+      event[:to_other] = "#{player.name} stops aiming at #{target.name}, dropping #{player.pronoun(:possessive)} weapon to #{player.pronoun(:possessive)} hip."
+      event[:to_player] = "You stop aiming at #{target.name}, dropping your weapon to your hip."
+      event[:to_target] = "#{player.name} lowers #{player.pronoun(:possessive)} weapon away from you."
+      player.aiming = false
+      player.aiming_at = nil
+      player.balance = true
+      player.info.in_combat = false
+      target.info.in_combat = false
+      room.out_event event
+    end
+
     def simple_block(event, player, room)
 
       return if not Combat.ready? player
@@ -98,6 +268,7 @@ module WeaponCombat
       player.balance = false
       room.out_event event
     end
+
 
     #Wield a weapon.
     def wield(event, player, room)
@@ -224,7 +395,9 @@ module WeaponCombat
       :hammer => [:charge, :sweep, :cicle_sweep, :bash, :swing, :circle_swing, :crush, :ground_slam, :block],
       :axe => [:charge, :thrust, :feint_thrust, :throw, :sweep, :circle_sweep, :bash, :slash, :cleave, :behead, :block],
       :dagger => [:charge, :thrust, :feint_thrust, :stab, :gouge, :throw, :slash, :circle_slash, :backstab, :pin, :block],
-      :pole => [:charge, :thrust, :feint_thrust, :lunge, :throw, :sweep, :circle_sweep, :pin, :block]
+      :pole => [:charge, :thrust, :feint_thrust, :lunge, :throw, :sweep, :circle_sweep, :pin, :block],
+      :pistol => [:shoot, :spray, :blast, :whip, :aim],
+      :rifle => [:shoot, :blast, :butt, :snipe, :aim]
     }
 
     def weapon_can? type, attack
@@ -241,6 +414,20 @@ module WeaponCombat
       end
 
       weapon
+
+    end
+
+    def get_weapons player, attack
+      weapons = []
+      player.equipment.get_all_wielded.each do |w|
+        if w.is_a? Weapon and w.info.weapon_type and weapon_can?(w.info.weapon_type, attack)
+          weapons << w
+          break
+        end
+      end
+
+      weapons
+
     end
   end
 end

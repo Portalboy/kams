@@ -20,4 +20,21 @@ class Area < Container
   def area
     self
   end
+
+  def world
+    if @container.nil?
+      nil
+    else
+      $manager.find(@container).world
+    end
+  end
+
+  def starship
+    if @container.nil?
+      nil
+    else
+      $manager.find(@container).starship
+    end
+  end
+
 end

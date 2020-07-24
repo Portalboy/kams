@@ -81,13 +81,17 @@ class Inventory < Gary
       return "nothing"
     else
       self.each do |o|
-        if o.name == ""
-          name = o.generic
-        else
-          name = o.name
-        end
 
-        inv_out << "#{name}"
+          #if o.class < Draggable
+          #  name = nil
+          #elsif o.name == ""
+          if o.name == "" #Temporary to replace the above
+            name = o.generic
+          else
+            name = o.name
+          end
+
+        inv_out << "#{name}" #unless o.class < Draggable
       end
     end
 

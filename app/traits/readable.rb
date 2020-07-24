@@ -10,7 +10,7 @@ module Readable
     super
 
     @readable_text = nil
-    @actions << "read"
+    #@actions << "read"
   end
 
   def read(event, player, room)

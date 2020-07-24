@@ -2,6 +2,7 @@ require 'lib/gameobject'
 
 class Weapon < GameObject
   include Wearable
+  attr_reader :sound
 
   def initialize(*args)
     super
@@ -12,5 +13,6 @@ class Weapon < GameObject
     info.layer = 0
     @movable = true
     @generic = "weapon"
+    @sound = {:block => "clang",:slash => "swipe"}
   end
 end

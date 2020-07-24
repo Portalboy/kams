@@ -18,6 +18,8 @@ module Clothing
         event[:to_player] = "You put on #{object.name}."
         event[:to_other] = "#{player.name} puts on #{object.name}."
         room.out_event(event)
+      else
+        player.output "Unable to wear #{object}! 'player.wear object returns' #{player.wear object}. Please notify an administrator."
       end
     end
 

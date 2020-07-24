@@ -46,7 +46,7 @@ class Gary
         yield go
       end
     rescue Exception => e
-      log "Exception occured while iterating the (duplicate list of) members of this Gary"
+      log "Exception occurred while iterating the (duplicate list of) members of this Gary"
       log e
       log e.inspect
       log e.backtrace.join("\n")

@@ -1,0 +1,5 @@
+Syntax: ACSTARSHIP [NAME]
+
+Creates a new starship for putting rooms and modules into.
+
+Example: acstarship Ethan Bradberry

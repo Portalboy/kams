@@ -131,10 +131,89 @@ module Generic
       room.out_event(event)
     end
 
+    def light(event, player, room)
+      object = nil
+      if event[:target]
+        object = object || player.search_inv(event[:target]) || room.find(event[:target])
+        if object.nil?
+          player.output("What are you trying to light?")
+          return
+        elsif player == object
+          player.output "I wouldn't recommend that."
+        elsif object.can? :light
+          if object.lit?
+            player.output "That is already lit."
+          else
+            if object.uses_fuel?
+              if object.fuel?
+                object.light
+                player.output("You light #{object.name}.")
+                event[:to_other] = "#{player.name.capitalize} grabs his lantern and turns the knob, igniting the interior with a tame orange flame."
+                event[:to_blind_other] = "You hear a squeak and the sound of gas hissing from a lantern."
+                event[:to_deaf_other] = event[:to_other]
+                room.out_event(event)
+              else
+                player.output("There is not enough fuel to light #{object.name}.")
+              end
+            else
+              object.light
+              player.output("You light the #{object.generic}.")
+            end
+          end
+        else
+          player.output("You cannot light that.")
+        end
+      else
+        player.output("What do you want to light?")
+      end
+    end
+
+    def extinguish(event, player, room)
+      object = nil
+      if event[:target]
+        object = object || player.search_inv(event[:target]) || room.find(event[:target])
+        if object.nil?
+          player.output("What are you trying to extinguish?")
+          return
+        elsif object.can? :extinguish
+          if object.lit?
+            object.extinguish
+            player.output("You extinguish #{object.name}.")
+            event[:to_other] = "#{player.name.capitalize} extinguishes #{object.name}."
+            event[:to_blind_other] = "You hear the gas valve of a lantern squeak as the hiss of gas ceases."
+            event[:to_deaf_other] = event[:to_other]
+            room.out_event(event)
+          else
+            player.output "That is not lit."
+          end
+        else
+          player.output("You cannot extinguish that.")
+        end
+      else
+        player.output("What do you want to extinguish?")
+      end
+    end
+
     #Look
     def look(event, player, room)
-      if player.blind?
-        player.output "You cannot see while you are blind."
+      if player.blind? #Can the player see?
+        if player.perma_blind? #Are they legit blind?
+          player.output "You cannot see while you are blind."
+          return
+        elsif room.always_dark?
+          room.calculate_light
+          if room.dark?
+          #TODO: Check for equipped light
+            #if room.light_source? #If there's a light, it will continue to 'if player.manning?' which is the start if the look logic.
+              player.output "It's pitch black in here!"
+              return
+            #end
+          end
+        end
+      end
+
+      if player.manning?
+        starship_look(event, player, room)
       else
         if event[:at]
           object = room if event[:at] == "here"
@@ -147,6 +226,9 @@ module Generic
 
           if object.is_a? Exit
             player.output object.peer
+          elsif object.is_a? Shipmodule
+            player.output("You are in a room called #{room.name} aboard #{room.starship.full_name}.")
+            #player.output "#{object.starship.info.ship.description}" #Maybe someday.
           elsif object.is_a? Room
             player.output("You are indoors.", true) if object.info.terrain.indoors
             player.output("You are underwater.", true) if object.info.terrain.underwater
@@ -166,6 +248,7 @@ module Generic
           else
             player.output object.long_desc
           end
+
         elsif event[:in]
           object = room.find(event[:in])
           object = player.inventory.find(event[:in]) if object.nil?
@@ -182,6 +265,76 @@ module Generic
             player.output(room.look(player))
           else
             player.output "Nothing to look at."
+          end
+        end
+      end
+    end
+
+    #TODO: Replace this with Scan, which will take time to complete but yield more detail
+    def starship_look(event, player, room)
+      if player.blind?
+        player.output "You cannot see the screen."
+      else
+        station = $manager.find(player.manning, room)
+        if station.module_type == :piloting
+          if $manager.find(station.container).respond_to?(:starship)
+            starship = $manager.find(station.container).starship #The starship the console is located in
+            if event[:at]
+              object = starship.room if event[:at] == "here"
+              player.output "The ships scanners report the following:" if event[:at] == "here"
+              #object = object || starship.search_inv(event[:at]) || starship.room.find(event[:at]) #This is looking at things contained within the starship. Uncomment when this code is moved to new SCAN event, as that will let you SCAN ENGINEERING and see module hp, etc
+              object = object || starship.room.find(event[:at]) #Replacement of the above, doesn't search the ship's contained objects, just the stuff in the room it's in.
+
+              if object.nil?
+                player.output("Look at what, again?")
+                return
+              end
+
+              if object.is_a? Exit
+                player.output object.peer
+              elsif object.is_a? Room
+                #player.output("You are indoors.", true) if object.info.terrain.indoors #Should never be true for Starships
+                player.output("#{starship.name} is underwater.", true) if object.info.terrain.underwater
+                player.output("#{starship.name} is flying over water.", true) if object.info.terrain.water
+
+                player.output "#{starship.name} is in a place called #{starship.room.name} in #{starship.area ? starship.area.name : "an unknown area"}, located on a world called #{starship.world.name}.", true
+                if starship.room.area
+                  player.output "The area is generally #{describe_area(starship.area)} and this spot is #{describe_area(starship.room)}."
+                elsif starship.room.info.terrain.room_type
+                  player.output "Where #{starship.name} is located is considered to be #{describe_area(starship.room)}."
+                else
+                  player.output "The ship's scanners aren't returning any other useful information."
+                end
+              elsif starship == object
+                player.output "The ships scanners report:\n#{starship.instance_variable_get("@long_desc")}", true
+                #player.output object.show_inventory #Would be overwealming information. TODO: Add shipmodule hp/stats return instead.
+              elsif object.instance_variable_get("@visible_from_afar")
+                player.output object.long_desc
+              else
+                player.output "The ship's scanners are not equipped to scan that."
+              end
+            elsif event[:in]
+              object = starship.room.find(event[:in])
+              #object = starship.inventory.find(event[:in]) if object.nil? #Too soon. See above comment.
+
+              if object.nil?
+                player.output("Look inside what?")
+              elsif not object.can? :look_inside
+                player.output("You cannot look inside that.")
+              else
+                object.look_inside(event)
+              end
+            else
+              if starship.room
+                player.output(starship.room.look(player))
+              elsif starship.landed_in
+                $manager.find(starship.landed_in)
+              else
+                player.output "Nothing to look at. starship.room: #{starship.room}"
+              end
+            end
+          else
+            player.output "This console appears to be disconnected."
           end
         end
       end
@@ -215,7 +368,52 @@ module Generic
       end
     end
 
+    #Aliases for Look
+    def examine(event, player, room)
+      look(event, player, room)
+    end
+
+    def inspect(event, player, room)
+      look(event, player, room)
+    end
+
     #Puts an object into a container.
+    def put_on(event, player, room)
+
+      item = player.inventory.find(event[:item])
+
+      if item.nil?
+        if response = player.equipment.worn_or_wielded?(event[:item])
+          player.output response
+        else
+          player.output "You do not seem to have a #{event[:item]}."
+        end
+
+        return
+      end
+
+      surface = player.search_inv(event[:surface]) || $manager.find(event[:surface], room)
+
+      if surface.nil?
+        player.output("There is no #{event[:surface]} in which to put #{item.name}.")
+        return
+      elsif not surface.is_a? Surface
+        player.output("You cannot put anything on #{surface.name}.")
+        return
+      elsif surface.can? :open and surface.closed?
+        player.output("You need to open #{surface.name} first.")
+        return
+      end
+
+      player.inventory.remove(item)
+      surface.add(item)
+
+      event[:to_player] = "You put #{item.name} in #{surface.name}."
+      event[:to_other] = "#{player.name} puts #{item.name} in #{surface.name}"
+
+      room.out_event(event)
+    end
+
     def put(event, player, room)
 
       item = player.inventory.find(event[:item])
@@ -472,7 +670,7 @@ module Generic
     #Show who is in the game.
     def who(event, player, room)
       players = $manager.find_all("class", Player)
-      output = ["The following people are visiting Ahln:"]
+      output = ["The following people are logged in:"]
       players.sort_by {player.name}.each do |playa|
         room = $manager.find playa.container
         output << "#{playa.name} - #{room.name if room}"
@@ -530,6 +728,84 @@ module Generic
         player.output "You finish your writing."
       end
     end
+
+    ###BEGIN STARSHIP COMMANDS###
+
+    def use(event, player, room)
+
+      object = room.find(event[:target])
+
+      if object.nil?
+        player.output "What are you trying to use?"
+        #player.output "object: #{object}, event: #{event}, room: #{room}, finder: #{room.find(event[:target])}" #Debug line
+        return
+      end
+
+      #Was `if object.class == Subsystem`
+
+      if object.is_a? Subsystem #This is so poor chaps can say USE Engineering and still have it work.
+        man(event, player, room)
+      elsif object.respond_to?(:use)
+        object.use(event, player, room)
+      else
+        #The actual logic for this method, above is just command disambiguation
+        player.output "You cannot use #{object.article} #{object.name}!"
+      end
+
+    end
+
+    #Man module.
+    def man(event, player, room)
+      if not player.balance
+        player.output "You cannot man a console while unbalanced."
+        #return
+      else
+        object = $manager.find(event[:target], player.room)
+
+        if object.nil?
+          player.output("What do you want to man? object: #{object}, find: #{$manager.find(event[:object], player.room)}, player.room: #{player.room}")
+        elsif not object.can? :mannable?
+          player.output("You cannot man #{object.name}.")
+        elsif object.occupied_by? player
+          player.output("You are already manning that!")
+        elsif player.manning?
+          player.output("You are already manning a station.")
+        elsif not object.has_room?
+          player.output("The #{object.generic} #{object.plural? ? "are" : "is"} already occupied.")
+        elsif player.man(object)
+          object.manned_by(player)
+          event[:to_player] = "You man the #{object.name}."
+          event[:to_other] = "#{player.name} mans the #{object.name}."
+          event[:to_deaf_other] = event[:to_other]
+          room.out_event(event)
+        else
+          player.output('You are unable to man.')
+        end
+      end
+    end
+=begin
+    def man(event, player, room)
+
+      object =  room.find(event[:target])
+
+      if object.nil?
+        player.output "What station are you trying to man?"
+        return
+      end
+
+      if object.mannable?
+
+      end
+      if object.respond_to?(:man)
+        object.man(event, player, room)
+      elsif object.is_a? Subsystem
+        player.output "You have attempted to man the #{object.name}!"
+      else
+        player.output "That isn't a station."
+      end
+    end
+=end
+    ###END STARSHIP COMMANDS###
 
     def taste(event, player, room)
 
@@ -756,6 +1032,8 @@ module Generic
           "in a foggy swamp"
         when :garden
           "a garden"
+          when :starship
+            "an artificial climate"
         else
           object.info.terrain.room_type.to_s
         end
@@ -790,9 +1068,50 @@ module Generic
           "a swamp"
         when :garden
           "a garden"
-        else
+          when :starship
+            "a starship"
+          else
+
           object.info.terrain.area_type.to_s
         end
+
+      elsif object.is_a? Starship
+        case object.info.terrain.starship_condition
+          when  nil
+            "unknown"
+          when :federation
+            "clean and white, with high-tech looking, semi-transparent blue panels adorning several surfaces"
+          when :road
+            "roadways"
+          when :forest
+            "forested"
+          when :desert
+            "desert"
+          when :grassland
+            "waving grasslands"
+          when :tundra
+            "barren tundra"
+          when :lake
+            "a lake"
+          when :pond
+            "a pond"
+          when :river
+            "a river"
+          when :bog
+            "a bog"
+          when :marsh
+            "a marsh"
+          when :swamp
+            "a swamp"
+          when :garden
+            "a garden"
+          when :starship
+            "a starship"
+          else
+
+            object.info.terrain.starship_condition
+        end
+
       end
     end
   end

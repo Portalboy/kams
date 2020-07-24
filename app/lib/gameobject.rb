@@ -20,6 +20,9 @@ class GameObject
   #Creates a new GameObject. Most of this long list of parameters is simply ignored at creation time,
   #because they can all be set later.
   def initialize(game_object_id = nil, container = nil, name = "", alt_names = Array.new, short_desc = "Nothing interesting here.", long_desc = "", generic = "", sex = "n", article = "a")
+    #It says that game_object_id is the first parameter, which is set to NIL when the creation is happening, yet somehow the manager is creating the new item with the same GOID as the room.
+    #It is as though somewhere along the line, the room's goid is being passed as the GOID rather than the Container. Not here, though.
+    #Bingo. It has the room's GOID under args. Let's find where it goes from there.
     @info = Info.new
     #Where the object is
     @container = container
@@ -204,6 +207,10 @@ class GameObject
       direction = "inside"
     when "out"
       direction = "outside"
+      when "embark"
+        direction = "a nearby starship"
+      when "disembark"
+        direction = "the boarding ramp"
     else
       direction = "the " << direction
     end
@@ -230,6 +237,10 @@ class GameObject
       direction = "go inside"
     when "out"
       direction = "go outside"
+      when "embark"
+        direction = "board the ship"
+      when "disembark"
+        direction = "the boarding ramp"
     else
       direction = "the " << direction
     end

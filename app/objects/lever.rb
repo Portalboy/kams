@@ -13,5 +13,20 @@ class Lever < GameObject
     @short_desc = 'lever'
     @long_desc = 'A lever, about 2 feet long with a grip situated near the top, just begging to be pulled.'
     @actions << "pull"
+    @pull_target = 'self'
+
+
+    def pull(event, player, room)
+      if @pull_target == 'self'
+        target = @name
+      else
+        target = @pull_target
+      end
+      object = $manager.find target
+      event = Event.new(:custom)
+      object.send(:leverpull, event)
+      event
+    end
+
   end
 end

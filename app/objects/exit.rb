@@ -6,7 +6,7 @@ require 'lib/gameobject'
 #also allows for exotic exit types, since the player can always do "go around" and an exit matching "around" would work.
 class Exit < GameObject
   #GOID of room the exit leads to.
-  attr_accessor :exit_room
+  attr_accessor :exit_room, :player_only, :ship_only
 
   #Creates a new exit. Connects to exit_room if that is provided.
   def initialize(exit_room = nil, *args)
@@ -15,6 +15,9 @@ class Exit < GameObject
     @generic = 'exit'
     @article = 'an'
     @alt_names ||= ["[Needs name]"]
+    @landing_exit = false
+    @player_only = false
+    @ship_only = false
   end
 
   #Returns the name of the room on the other side.

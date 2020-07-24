@@ -55,6 +55,7 @@ module PlayerConnection
     @ip_address = Socket.unpack_sockaddr_in(self.get_peername)[1]
 
     print File.read(ServerConfig.intro_file) if File.exist? ServerConfig.intro_file
+    print "\n"
 
     echo_on
 

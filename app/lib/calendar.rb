@@ -24,13 +24,13 @@ class Calendar
     unless init
       if @last_hour != @hour
         msg = time_change
-        $manager.alert_all msg if msg
+        $manager.alert_outdoors(msg, true) if msg
       end
       if @last_day != @day
-        $manager.alert_all day_change
+        $manager.alert_outdoors(day_change, true)
       end
       if @last_year != @year
-        $manager.alert_all year_change
+        $manager.alert_outdoors year_change
       end
     end
 
@@ -53,7 +53,7 @@ class Calendar
 
   #Returns a String representation of the current time.
   def time
-    "It is #{time_of_day} in Ahln."
+    "It is #{time_of_day} on this world."
   end
 
   #Returns a String representation of the current date.
@@ -78,7 +78,7 @@ class Calendar
 
   #Message when the year changes.
   def year_change
-    "Happy new year! It is now #{@year} years past an arbitrary date!"
+    "It is now #{@year} years since the galactic superwar!"
   end
 
   #Message when the day changes.

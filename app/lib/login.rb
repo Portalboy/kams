@@ -235,6 +235,25 @@ module Login
   def ask_color
     print 'Use color (y/n): '
     @state = :new_color
+    #ask_sound #TODO: Add sound option
+  end
+
+  def ask_sound
+    print 'Use sound? (y/n): '
+    @state = :new_sound
+  end
+
+  def new_sound(data)
+    data.strip!
+    case data
+      when /^y/i
+        @use_sound = true
+      when /^n/i
+        @use_color = false
+      else
+        ask_sound
+        return
+    end
   end
 
   #Checks color and moves on to create_new_player

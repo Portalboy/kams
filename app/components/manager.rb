@@ -20,7 +20,7 @@ class Manager
   #a Manager object in an external script.
   def initialize(objects = nil)
     @soft_restart = false
-    @storage = StorageMachine.new()
+    @storage = StorageMachine.new
     @uptime = Time.new.to_i
 
     unless objects
@@ -156,7 +156,10 @@ class Manager
       else
         object = klass.new(args)
       end
-    else
+    #elsif klass.to_s == 'Container' or klass < Container
+      else #Replaced above line
+    #  object = klass.new(nil, nil, room_goid)
+    #else
       object = klass.new(nil, room_goid)
     end
 
@@ -437,6 +440,23 @@ class Manager
     end
   end
 
+  def alert_outdoors(message = "<important>Server is shutting down, sorry!</important>", ignore_lost = true)
+    @game_objects.find_all('class', Player).each do |object|
+      begin
+        #alert_all("beginning alert_outdoors")
+        #alert_all "beginning first 'unless', object: #{self.find(object.room)}, indoors: #{self.find(object.room).indoors?}"
+        unless self.find(object.room).indoors?
+          #alert_all "beginning second 'unless'"
+          unless ignore_lost and object.container.nil?
+            object.output message
+            #alert_all "ending second unless"
+          end
+        end
+      rescue
+      end
+    end
+  end
+
   #Finds the object in the container. If container is nil, then searches whole world.
   def find(name, container = nil, findall = false)
     if container.nil?
@@ -463,6 +483,12 @@ class Manager
     @soft_restart = true
     $manager.stop
     EventMachine.add_timer(3) { EventMachine.stop_event_loop }
+  end
+
+  def shutdown
+    alert_all("<important>Server closing...</important>")
+    $manager.stop
+    #Currently unused. TODO: Add 'shutdown' command.
   end
 
   #Calendar#time

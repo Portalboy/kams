@@ -15,6 +15,7 @@ module Position
     if @positions[:sitting_on].nil?
       @positions[:standing_on] = nil
       @positions[:lying_on] = nil
+      @positions[:manning] = nil
       if target.nil?
         @positions[:sitting_on] = 'ground'
         @pose = 'sitting on the ground'
@@ -28,16 +29,36 @@ module Position
     end
   end
 
+  def man(target = nil)
+    if @positions[:manning].nil?
+      @positions[:sitting_on] = nil
+      @positions[:standing_on] = nil
+      @positions[:lying_on] = nil
+      if target.nil?
+        @positions[:manning] = nil
+        @pose = "standing"
+      else
+        @positions[:manning] = target.goid
+        @pose = "manning #{target.name}"
+      end
+      true
+    else
+      false
+    end
+  end
+
   #Stands up or on something if a target is given
   def stand(target = nil)
     if prone? and target.nil?
       @positions[:sitting_on] = nil
       @positions[:lying_on] = nil
       @pose = nil
+      @positions[:manning] = nil
       true
     elsif not target.nil?
       @positions[:sitting_on] = nil
       @positions[:lying_on] = nil
+      @positions[:manning] = nil
       @positions[:standing_on] = target.goid
       @pose = "standing on #{target.name}"
       true
@@ -90,7 +111,7 @@ module Position
 
   #True if the object is sitting or lying down.
   def prone?
-    !!(@positions[:sitting_on] or @positions[:lying_on])
+    !!(@positions[:sitting_on] or @positions[:lying_on] or @positions[:manning])
   end
 
   #True if not prone.
@@ -112,5 +133,17 @@ module Position
 
   def pose=(val)
     @pose = val
+  end
+
+  def manning
+    @positions[:manning]
+  end
+
+  def manning=(val)
+    @manning = val
+  end
+
+  def manning?
+    !!@positions[:manning]
   end
 end

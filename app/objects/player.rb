@@ -54,9 +54,24 @@ class Player < LivingObject
     @page_height = 20
     @deaf = false
     @blind = false
+    @perma_blind = false
     @reply_to = nil
     @prompt_shown = false
+    @dragging = nil
     info.stats.satiety = 120
+  end
+
+  def has_light? #Searches the contents of the room for a light source.
+    lights = @inventory.find_all('class', Lantern) #Temporary - TODO: check for inheritance from a root light object that all lights inherit from.
+    lit_lights = []
+    lights.each do |l|
+      lit_lights << l if l.lit?
+    end
+    players = @inventory.find_all('class', :Player)
+    players.each do |p|
+      lit_lights << p if p.has? 'lantern'
+    end
+    lit_lights.count > 0
   end
 
   #Searches inventory and equipment for item.
@@ -82,11 +97,37 @@ class Player < LivingObject
     @blind
   end
 
+  def blind=(args)
+    @blind = args
+  end
+
+  def perma_blind?
+    @perma_blind
+  end
+
   #Sets balance
   def balance= val
     #was = @balance
     @balance = val
     #self.output "You recover your balance." if @balance and not was
+  end
+
+  def aiming= val
+    #was = @aiming
+    @aiming = val
+    #self.output "You recover your aim." if @aiming and not was
+  end
+
+  def aiming_at= value
+    @aiming_at = value
+  end
+
+  def dragging?
+    @dragging.nil?
+  end
+
+  def dragging=(value)
+    @dragging = value
   end
 
   #Direct access to the PlayerConnection for this Player.
@@ -174,14 +215,15 @@ class Player < LivingObject
       end
 
     position = case
-      when self.prone?
-        "_"
-      when @balance
-        "|"
-      else
-        "\\"
-      end
-
+                 when self.prone?
+                   "_"
+                 when @balance
+                   "|"
+                 when @aiming
+                   "+"
+                 else
+                   "\\"
+               end
     "<people>H:#{info.stats.health}#{position}></> #{IAC + GA}"
   end
 
@@ -196,6 +238,16 @@ class Player < LivingObject
   #input, feeds it to the CommandParser, then sends the event
   #(if any) to the Manager.
   def handle_input(input)
+=begin    #Couldn't get this working, scrapped it. The event handler should be handling this anyways.
+    if @player.manning?
+      station = $manager.find(@player.manning, @player.room)
+      if station.respond_to?(input.parameterize.to_sym)
+        input_to_symbol = input.parameterize.to_sym
+        station.input_to_symbol
+      end
+    end
+=end
+
     if input.nil? or input.chomp.strip == ""
       @player.print(prompt) unless @player.closed?
       return
@@ -245,6 +297,12 @@ class Player < LivingObject
     inv_out << @inventory.show
 
     inv_out << ".\n" << @equipment.show
+
+    if @dragging
+      dragged_object = $manager.find(@dragging, room)
+      inv_out << "You are dragging #{dragged_object.prefix} #{dragged_object.name}"
+    end
+    inv_out
   end
 
   #Returns a String with the long_desc of the Player and a description of their visible equipment.

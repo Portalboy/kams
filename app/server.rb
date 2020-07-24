@@ -31,18 +31,12 @@ require 'lib/util'
 require 'components/manager'
 require 'lib/playerconnect'
 
-
-#for arg in ARGV
-  #if arg = 
-#end
-
-
 #The Server is what starts everything up. In fact, that is pretty much all it does. To use, call Server.new.
 class Server
   #This is the main server loop. Just call it.
   #Creates the Manager, starts the EventMachine, and closes everything down when the time comes.
   def initialize(address, port)
-    $manager = Manager.new()
+    $manager = Manager.new
     EventMachine.run do
       EventMachine.add_periodic_timer(ServerConfig.update_rate) { $manager.update_all }
       if ServerConfig.save_rate and ServerConfig.save_rate > 0

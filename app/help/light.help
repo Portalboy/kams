@@ -1,0 +1,6 @@
+Command: Light
+Syntax: LIGHT <object>
+
+Light an object, such as a match or lamp.
+
+See also: EXTINGUISH, UNLIGHT, REFUEL
