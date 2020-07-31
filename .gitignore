@@ -4,3 +4,5 @@ objects/reactions
 deploy.sh
 todo
 intro.txt
+deploy.ps1
+build.ps1

@@ -1,1 +1,1 @@
-docker build -t kams .
+docker build -t starmud .
